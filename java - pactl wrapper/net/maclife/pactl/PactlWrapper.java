@@ -8,18 +8,26 @@ public class PactlWrapper
 {
 	public static final String CLIENT_NAME = "JavaWrapperForPactl";
 
-	String sServer;
+	public static String sServer = null;
 
 	public static String pactl (String... params)
 	{
-		String[] args = new String[3 + (params==null ? 0 : params.length)];
+		int nExtraParams = 3;
+		if (sServer!=null && !sServer.isEmpty ())
+			nExtraParams += 2;
+		String[] args = new String[nExtraParams + (params==null ? 0 : params.length)];
 		args[0] = "pactl";
 		args[1] = "--client-name";
 		args[2] = CLIENT_NAME;
+		if (sServer!=null && !sServer.isEmpty ())
+		{
+			args[3] = "--server";	// 这些 options 貌似只能在 pactl 的命令前面，在后面会报错，比如 `pactl list sinks --server localhost`: "Specify nothing, or one of: modules, sinks, sources, sink-inputs, source-outputs, clients, samples, cards"
+			args[4] = sServer;
+		}
 		if (params != null)
 		{
 			for (int i=0; i<params.length; i++)
-				args[3+i] = params[i];
+				args[nExtraParams+i] = params[i];
 		}
 
 		ProcessBuilder pbPactl = new ProcessBuilder ();
