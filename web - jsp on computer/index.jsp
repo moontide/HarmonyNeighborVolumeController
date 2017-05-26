@@ -22,8 +22,8 @@
 		<div>当前主音量: <span id='current_main_volume' class='data'></span><%-- 要不断更新，有可能从不同的源头调节音量 --%>
 			<div class='volume-bar-container'><div id='main_volume_bar' class='volume-bar'></div></div>
 			<div>
-				<button onClick='SetVolume ("-");'>主音量--</button>
-				<button onClick='SetVolume ("+");' style='float:right;'>主音量++</button>
+				<button onClick='AdjustVolume ("-");'>主音量--</button>
+				<button onClick='AdjustVolume ("+");' style='float:right;'>主音量++</button>
 			</div>
 
 			<label style='margin:auto auto'><input type='checkbox' onCheck=''/>对低音声道单独调节</label>

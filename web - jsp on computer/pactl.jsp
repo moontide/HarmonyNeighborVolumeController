@@ -48,15 +48,17 @@ ObjectMapper jacksonObjectMapper_Loose = new ObjectMapper ();	// 不那么严格
 	jacksonObjectMapper_Loose.configure (JsonParser.Feature.ALLOW_NUMERIC_LEADING_ZEROS, true);	// 允许数值前面带 0
 
 jsonResult = jacksonObjectMapper_Loose.createObjectNode ();
-jsonResult.put ("ret", 0);
+jsonResult.put ("rc", 0);
 try
 {
+
+PactlWrapper.sServer = "localhost";	// 防止【运行 tomcat 的用户是 tomcat 时 执行 pactl 会失败】的问题
 
 if (StringUtils.isEmpty (sAction) || StringUtils.equalsIgnoreCase (sAction, "get-volume"))
 {
 	GetVolume (sPACTL_SINK_DEVICE, sPACTL_SINK_DEVICE_CHANNEL_TO_GET_VOLUME, jsonResult);
 }
-else if (StringUtils.equalsIgnoreCase (sAction, "set-volume"))
+else if (StringUtils.equalsIgnoreCase (sAction, "adjust-volume"))
 {
 	String sDirection = StringUtils.trimToEmpty (request.getParameter ("direction"));
 
@@ -71,18 +73,40 @@ else if (StringUtils.equalsIgnoreCase (sAction, "set-volume"))
 		nDestinationVolume += nVOLUME_ADJUST_STEP;
 		if (nCurrentVolume >= nMAX_ALLOWED_VOLUME_TO_ADJUST)	// 当前音量已经超过能调节到的最大音量
 		{
+			jsonResult.put ("rc", 403);
+			jsonResult.put ("msg", "当前音量 " + sVolume + "% 已经超过(或者等于)你能调节到的最大音量 " + nMAX_ALLOWED_VOLUME_TO_ADJUST + "%，所以禁止再调大音量。");
 		}
-		else if (nMAX_ALLOWED_VOLUME_TO_ADJUST > nDestinationVolume)
+		else
 		{
-			jsonResult.put ("ret", 403);
-			jsonResult.put ("msg", "您能调节到的最大音量是 " + nMAX_ALLOWED_VOLUME_TO_ADJUST + "%");
+			if (nDestinationVolume > nMAX_ALLOWED_VOLUME_TO_ADJUST)
+			{
+				nDestinationVolume = nMAX_ALLOWED_VOLUME_TO_ADJUST;
+				//jsonResult.put ("rc", 403);
+				//jsonResult.put ("msg", "您能调节到的最大音量是 " + nMAX_ALLOWED_VOLUME_TO_ADJUST + "%");
+			}
+			PactlWrapper.pactl_set_sink_volume (sPACTL_SINK_DEVICE, nDestinationVolume + "%");
 		}
 	}
 	else if (StringUtils.equalsIgnoreCase (sDirection, "-"))
 	{
+		nDestinationVolume -= nVOLUME_ADJUST_STEP;
+		if (nCurrentVolume <= nMIN_ALLOWED_VOLUME_TO_ADJUST)	// 当前音量已经低于能调节到的最小音量
+		{
+			jsonResult.put ("rc", 403);
+			jsonResult.put ("msg", "当前音量 " + sVolume + "% 已经低于(或者等于)你能调节到的最小音量 " + nMIN_ALLOWED_VOLUME_TO_ADJUST + "%，所以禁止再调小音量。");
+		}
+		else
+		{
+			if (nDestinationVolume < nMIN_ALLOWED_VOLUME_TO_ADJUST)
+			{
+				nDestinationVolume = nMIN_ALLOWED_VOLUME_TO_ADJUST;
+			}
+			PactlWrapper.pactl_set_sink_volume (sPACTL_SINK_DEVICE, nDestinationVolume + "%");
+		}
 	}
 	else
 	{
+		/*
 		if (true && bPLAY_BAIDU_TTS_WHEN_ADJUSTING_VOLUME)
 		{
 			// 调用百度 TTS 合成文字
@@ -91,6 +115,7 @@ else if (StringUtils.equalsIgnoreCase (sAction, "set-volume"))
 		jsonResult.put ("volume", "当前音量");
 		jsonResult.put ("volume.lfe", "当前低音声道音量");
 		jsonResult.put ("volume.bluetooth", "当前蓝牙输入音量");
+		*/
 	}
 }
 }

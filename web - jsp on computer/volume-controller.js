@@ -30,16 +30,16 @@ function GetAndDisplayVolume ()
 	);
 }
 
-function SetVolume (sDirection)
+function AdjustVolume (sDirection)
 {
-	$.get ('pactl.jsp', {mac:$('#mac_address').val(), cmd:'set-volume', direction:sDirection})
+	$.get ('pactl.jsp', {mac:$('#mac_address').val(), cmd:'adjust-volume', direction:sDirection})
 	.done
 	(
 		function (data)
 		{
 			if (data.rc == 0)
 			{
-				DisplayVolume (data);
+				//DisplayVolume (data);
 			}
 			else
 			{
