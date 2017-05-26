@@ -9,7 +9,8 @@ Confucius said
 *No, I didn't say that.* -- Confucius
 
 **Harmony Neighbor Volume Controller can let your neighbor adjust your computer playback volume from a web interface.**
-If your volume from your computer (which is running Linux on it and use PulseAudio as sound server) is too loud (or too low), your neighbor may complain about it. Then, your neighbor can adjust the volume via this web controller to fit his demand.
+
+If your computer playback volume (which is running Linux on it and use PulseAudio as sound server) is too loud (or too low), your neighbors may complain about it. Then, your neighbors can adjust the volume via this web controller to fit their demands.
 
 
 Usually, I suggest to run this controller with a wireless router which is running OpenWRT or DD-WRT or other roms which can setup a captive portal.
