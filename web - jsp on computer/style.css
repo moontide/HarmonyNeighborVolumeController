@@ -1,0 +1,50 @@
+body
+{
+	width: 80%;
+	margin: auto auto;
+}
+#volume_controller_container
+{
+	color: green;
+	background-color: #efe;
+}
+#bluetooth_container
+{
+	color: blue;
+	background-color: #ccf;
+}
+#feedback_container
+{
+	color: purple;
+	background-color: #ffc;
+}
+
+#earphone_plugged_in_text
+{
+	font-size: 200%;
+	color: red;
+	background-color: yellow;
+	font-weight: bold;
+}
+
+.volume-bar-container
+{
+	width:100%;
+	border:1px solid;
+}
+.volume-bar
+{
+	margin: 4px;
+	width: 0;
+	line-height: 200%;
+	background-color: green;
+
+	color: white;
+	text-align: right;
+	font-weight: bold;
+}
+.data
+{
+	color: red;
+	font-size: larger;
+}
