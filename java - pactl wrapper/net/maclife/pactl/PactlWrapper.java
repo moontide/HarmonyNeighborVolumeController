@@ -40,7 +40,7 @@ public class PactlWrapper
 			br = new BufferedReader (new InputStreamReader (isStdout));
 			while ((sLine = br.readLine ()) != null)
 			{
-System.out.println (sLine);
+//System.out.println (sLine);
 				sb.append (sLine);
 				sb.append ("\n");
 			}
@@ -55,7 +55,10 @@ System.err.println (sLine);
 
 			p.waitFor();
 			int rc = p.exitValue();
+			if (rc != 0)
+			{
 System.out.println ("pactl 执行 " + (rc == 0 ? "成功" : "失败：" + rc));
+			}
 		}
 		catch (IOException | InterruptedException e)
 		{
@@ -216,6 +219,10 @@ System.out.println ("pactl 执行 " + (rc == 0 ? "成功" : "失败：" + rc));
 					}
 					else if (sAttributeName.equalsIgnoreCase ("Formats"))
 					{
+					}
+					else if (sAttributeName.charAt (0) != '\t' && sAttributeName.charAt (0) != ' ')
+					{
+						mapResult.put (sLine1 + "." + sAttributeName, sAttributeValue);
 					}
 				}
 			}
