@@ -12,23 +12,67 @@
 <%@ page import="com.chinamotion.database.*"%>
 
 <%!
-void GetVolume (String sSinkIndex, String sChannel, ObjectNode jsonResult)
+void GetSinkVolume (String sSinkIndex, String sChannel, ObjectNode jsonResult)
 {
 	Map<String, Object> mapResult = PactlWrapper.pactl_list ("sinks");
 	String sVolume = PactlWrapper.GetSinkVolumeInPercentage (mapResult, sSinkIndex, sChannel);
-	jsonResult.put ("volume", sVolume);
+	jsonResult.put ("sink_volume", sVolume);
 
 	String sKeyName_SinkDescription = "Sink #" + sSinkIndex + ".Description";
 	jsonResult.put ("sink_name", (String)mapResult.get(sKeyName_SinkDescription));
 
 	String sKeyName_ActivePort = "Sink #" + sSinkIndex + ".Active Port";
 	String sActivePort = (String)mapResult.get(sKeyName_ActivePort);
+	String sKeyName_ActivePortName = "Sink #" + sSinkIndex + ".Ports." + sActivePort + ".name";
+	String sActivePortName = (String)mapResult.get(sKeyName_ActivePortName);
+	jsonResult.put ("sink_active_port_name", sActivePortName);
 	boolean bEarphonePlugged = false;
 	if (StringUtils.isNotEmpty (sActivePort) && StringUtils.endsWithIgnoreCase(sActivePort, "-headphones"))
 	{
 		bEarphonePlugged = true;
 	}
 	jsonResult.put ("earphone_plugged_in", bEarphonePlugged);
+}
+
+void GetSourceVolume (String sSourceIndex, String sChannel, ObjectNode jsonResult)
+{
+	Map<String, Object> mapResult = PactlWrapper.pactl_list ("sources");
+	String sVolume = PactlWrapper.GetSourceVolumeInPercentage (mapResult, sSourceIndex, sChannel);
+	jsonResult.put ("source_volume", sVolume);
+
+	String sKeyName_SourceDescription = "Source #" + sSourceIndex + ".Description";
+	jsonResult.put ("source_name", (String)mapResult.get (sKeyName_SourceDescription));
+
+	String sKeyName_ActivePort = "Source #" + sSourceIndex + ".Active Port";
+	String sActivePort = (String)mapResult.get(sKeyName_ActivePort);
+	String sKeyName_ActivePortName = "Source #" + sSourceIndex + ".Ports." + sActivePort + ".name";
+	String sActivePortName = (String)mapResult.get (sKeyName_ActivePortName);
+	jsonResult.put ("source_active_port_name", sActivePortName);
+}
+
+void GetLastBluetoothSourceVolume (String sChannel, ObjectNode jsonResult)
+{
+	Map<String, Object> mapResult = PactlWrapper.pactl_list ("sources");
+	String sLastSourceBlockName_Bluetooth = PactlWrapper.GetLastSourceBlockName_Bluetooth (mapResult);
+	String sVolume = null;
+	//sVolume = PactlWrapper.GetSourceVolumeInPercentage (mapResult, sSourceIndex, sChannel);
+
+	if (StringUtils.isNotEmpty (sLastSourceBlockName_Bluetooth))
+	{
+		sVolume = PactlWrapper.GetVolumeInPercentage (mapResult, sLastSourceBlockName_Bluetooth, sChannel);
+		jsonResult.put ("source_volume", sVolume);
+
+		String sKeyName_SourceDescription = sLastSourceBlockName_Bluetooth + ".Description";
+		String sKeyName_BluetoothDeviceAlias = sLastSourceBlockName_Bluetooth + ".Properties.bluez.alias";	// 之所以用这个，而不用上面的 ".Description" 是因为目前的 bluez 模块的 .Description 不支持汉字 -- 汉字都被清空了
+		//jsonResult.put ("source_name", (String)mapResult.get (sKeyName_SourceDescription));
+		jsonResult.put ("source_name", (String)mapResult.get (sKeyName_BluetoothDeviceAlias));
+
+		String sKeyName_ActivePort = sLastSourceBlockName_Bluetooth + ".Active Port";
+		String sActivePort = (String)mapResult.get(sKeyName_ActivePort);
+		String sKeyName_ActivePortName = sLastSourceBlockName_Bluetooth + ".Ports." + sActivePort + ".name";
+		String sActivePortName = (String)mapResult.get (sKeyName_ActivePortName);
+		jsonResult.put ("source_active_port_name", sActivePortName);
+	}
 }
 %>
 
@@ -38,7 +82,19 @@ void GetVolume (String sSinkIndex, String sChannel, ObjectNode jsonResult)
 ObjectNode jsonResult = null;
 String sMAC = StringUtils.trimToEmpty (request.getParameter ("mac"));	// 如果是通过 captive portal 访问的，应该会带过来使用人的设备（比如手机、笔记本电脑或者插在任何机器上的无线网卡）的 MAC 地址
 String sClientIP = request.getRemoteAddr ();
-String sAction = request.getParameter ("cmd");
+String sAction = StringUtils.trimToEmpty (request.getParameter ("cmd"));
+String sIsSource = StringUtils.trimToEmpty (request.getParameter ("isSource"));
+boolean isSource = false;
+try
+{
+	if (StringUtils.isNotEmpty (sIsSource))
+	{
+		isSource = Boolean.parseBoolean (sIsSource);
+	}
+}
+catch (Exception e)
+{
+}
 
 ObjectMapper jacksonObjectMapper_Loose = new ObjectMapper ();	// 不那么严格的选项，但解析时也支持严格选项
 	jacksonObjectMapper_Loose.configure (JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES, true);	// 允许不对字段名加引号
@@ -56,7 +112,16 @@ PactlWrapper.sServer = "localhost";	// 防止【运行 tomcat 的用户是 tomca
 
 if (StringUtils.isEmpty (sAction) || StringUtils.equalsIgnoreCase (sAction, "get-volume"))
 {
-	GetVolume (sPACTL_SINK_DEVICE, sPACTL_SINK_DEVICE_CHANNEL_TO_GET_VOLUME, jsonResult);
+	if (! isSource)
+		GetSinkVolume (sPACTL_SINK_DEVICE, sPACTL_SINK_DEVICE_CHANNEL_TO_GET_VOLUME, jsonResult);
+	else
+	{
+		GetLastBluetoothSourceVolume (sPACTL_SOURCE_DEVICE_CHANNEL_TO_GET_VOLUME, jsonResult);
+		if (jsonResult.get ("source_volume") == null)	// 没有蓝牙音源接入进来
+		{
+			jsonResult.put ("rc", 404);
+		}
+	}
 }
 else if (StringUtils.equalsIgnoreCase (sAction, "adjust-volume"))
 {

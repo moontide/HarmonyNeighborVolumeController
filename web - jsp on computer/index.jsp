@@ -14,16 +14,16 @@
 <body>
 	<input id='mac_address' type='hidden' value='<%=request.getParameter("mac")==null ? "" : request.getParameter("mac")%>'/>
 	<div id='volume_controller_container'>
-	<h1>音量控制</h1>
+	<h1>放音音量控制</h1><%-- 输出音量调节 --%>
 	<div>
 		<div id='earphone_plugged_in_text' style='display:none'>耳机已经插上，禁止调节音量。如果你的确还听到声音，则音箱可能接的不是本电脑，或者听到的不是这个音箱发出的声音。</div><%-- 只在接音箱时才允许调节音量（但对于音箱上自带耳机接口的情况，对电脑来说区分不出来：还是属于音箱，还是允许调节音量）--%>
 
-		<div>所控制的 PulseAudio 播放设备: <span id='pulseaudio_sink_name' class='data'></span></div>
-		<div>当前主音量: <span id='current_main_volume' class='data'></span><%-- 要不断更新，有可能从不同的源头调节音量 --%>
-			<div class='volume-bar-container'><div id='main_volume_bar' class='volume-bar'></div></div>
+		<div>所控制的放音设备: <span id='pulseaudio_sink_name' class='data'></span><br/><span id='pulseaudio_sink_port' class='data'></span></div>
+		<div>当前音量: <span id='sink_volume' class='data'></span><%-- 要不断更新，有可能从不同的源头调节音量 --%>
+			<div class='volume-bar-container'><div id='sink_volume_bar' class='volume-bar'></div></div>
 			<div>
-				<button onClick='AdjustVolume ("-");'>主音量--</button>
-				<button onClick='AdjustVolume ("+");' style='float:right;'>主音量++</button>
+				<button onClick='AdjustVolume ("-");'>音量--</button>
+				<button onClick='AdjustVolume ("+");' style='float:right;'>音量++</button>
 			</div>
 
 			<label style='margin:auto auto'><input type='checkbox' onCheck=''/>对低音声道单独调节</label>
@@ -43,11 +43,20 @@
 	</div>
 
 	<div id='bluetooth_container'>
-	<h1>蓝牙音源</h1>
+	<h1>蓝牙及其输入音量控制</h1>
 	<div>
 		<div>当前接入的蓝牙设备【品牌名/制造商公司名】:
-			MAC 地址:
-			MAC 地址对应的厂商:
+			<span id='pulseaudio_source_name' class='data'></span><br/><span id='pulseaudio_source_port' class='data'></span>
+			<br/>
+			蓝牙 MAC 地址:<br/>
+			蓝牙 MAC 地址对应的厂商:
+		</div>
+		<div>当前音量: <span id='source_volume' class='data'></span><%-- 要不断更新，有可能从不同的源头调节音量 --%>
+			<div class='volume-bar-container'><div id='source_volume_bar' class='volume-bar'></div></div>
+			<div>
+				<button onClick='AdjustVolume ("-", true);'>音量--</button>
+				<button onClick='AdjustVolume ("+", true);' style='float:right;'>音量++</button>
+			</div>
 		</div>
 	</div>
 	</div>

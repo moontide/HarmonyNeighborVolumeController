@@ -7,17 +7,6 @@ function Init ()
 	GetAndDisplayVolume ();
 }
 
-function DisplayVolume (jsonData)
-{
-	var volume = jsonData.volume;
-	$('#pulseaudio_sink_name').text (jsonData.sink_name);
-	$('#current_main_volume').text (volume);
-	$('#main_volume_bar').text (volume);
-	$('#main_volume_bar').css ('width', volume);
-
-	$('#earphone_plugged_in_text').css ('display', jsonData.earphone_plugged_in ? '' : 'none');
-}
-
 function GetAndDisplayVolume ()
 {
 	$.get ('pactl.jsp', {mac:$('#mac_address').val()})
@@ -28,11 +17,77 @@ function GetAndDisplayVolume ()
 			DisplayVolume (data);
 		}
 	);
+
+	$.get ('pactl.jsp', {mac:$('#mac_address').val(), isSource:true})
+	.done
+	(
+		function (data)
+		{
+			DisplaySourceVolume (data);
+		}
+	);
+}
+
+function DisplayVolume (jsonData)
+{
+	var volume = jsonData.sink_volume;
+	$('#pulseaudio_sink_name').text (jsonData.sink_name);
+	$('#sink_volume').text (volume);
+	$('#sink_volume_bar').text (volume);
+	$('#sink_volume_bar').css ('width', volume);
+
+	$('#pulseaudio_sink_port').text (jsonData.sink_active_port_name);
+
+	$('#earphone_plugged_in_text').css ('display', jsonData.earphone_plugged_in ? '' : 'none');
+}
+
+function DisplaySourceVolume (jsonData)
+{
+	switch (jsonData.rc)
+	{
+		case 0:
+			var volume = jsonData.source_volume;
+			$('#pulseaudio_source_name').text (jsonData.source_name);
+			$('#current_source_volume').text (volume);
+			$('#source_volume_bar').text (volume);
+			$('#source_volume_bar').css ('width', volume);
+
+			$('#pulseaudio_source_port').text (jsonData.source_active_port_name);
+			break;
+		case 404:
+			$('#pulseaudio_source_name').text ('');
+			$('#current_source_volume').text ('');
+			$('#source_volume_bar').text ('');
+			$('#source_volume_bar').css ('width', '0%');
+			$('#pulseaudio_source_port').text ('');
+			break;
+		default:
+			break;
+	}
 }
 
 function AdjustVolume (sDirection)
 {
 	$.get ('pactl.jsp', {mac:$('#mac_address').val(), cmd:'adjust-volume', direction:sDirection})
+	.done
+	(
+		function (data)
+		{
+			if (data.rc == 0)
+			{
+				//DisplayVolume (data);
+			}
+			else
+			{
+				alert (data.msg);
+			}
+		}
+	);
+}
+
+function AdjustInputVolume (sDirection)
+{
+	$.get ('pactl.jsp', {mac:$('#mac_address').val(), cmd:'adjust-volume', direction:sDirection, isSource:true})
 	.done
 	(
 		function (data)
