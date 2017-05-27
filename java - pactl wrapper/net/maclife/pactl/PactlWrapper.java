@@ -3,6 +3,8 @@ package net.maclife.pactl;
 import java.io.*;
 import java.util.*;
 
+import org.apache.commons.lang3.*;
+
 
 public class PactlWrapper
 {
@@ -13,13 +15,13 @@ public class PactlWrapper
 	public static String pactl (String... params)
 	{
 		int nExtraParams = 3;
-		if (sServer!=null && !sServer.isEmpty ())
+		if (StringUtils.isNotEmpty (sServer))
 			nExtraParams += 2;
 		String[] args = new String[nExtraParams + (params==null ? 0 : params.length)];
 		args[0] = "pactl";
 		args[1] = "--client-name";
 		args[2] = CLIENT_NAME;
-		if (sServer!=null && !sServer.isEmpty ())
+		if (StringUtils.isNotEmpty (sServer))
 		{
 			args[3] = "--server";	// 这些 options 貌似只能在 pactl 的命令前面，在后面会报错，比如 `pactl list sinks --server localhost`: "Specify nothing, or one of: modules, sinks, sources, sink-inputs, source-outputs, clients, samples, cards"
 			args[4] = sServer;
@@ -158,86 +160,157 @@ System.out.println ("pactl 执行 " + (rc == 0 ? "成功" : "失败：" + rc));
 	{
 		Map<String, Object> mapResult = new HashMap<String, Object> ();
 		String[] arrayBlocks = sOutputOfListCommand.split ("\\n\\n");
-		for (String sBlock : arrayBlocks)
+		for (int i=0; i<arrayBlocks.length; i++)
 		{
-			String[] arrayLines = sBlock.split ("\\n");
-			String sLine1 = arrayLines[0];
-			if (sLine1.startsWith ("Sink") || sLine1.startsWith ("Source"))
+			String sBlock = arrayBlocks[i];
+			String[] arrayBlockLines = sBlock.split ("\\n");
+			String sFirstLineOfBlock = arrayBlockLines[0];
+			if (StringUtils.startsWithIgnoreCase (sFirstLineOfBlock, "Sink") || StringUtils.startsWithIgnoreCase (sFirstLineOfBlock, "Source"))
 			{
-			String sAttributeName = "";
-			for (int i=1; i<arrayLines.length; i++)
-			{
-				String sLine = arrayLines[i];
-				sLine = sLine.substring (1);	// 去掉左边的 TAB 字符
-				if (sAttributeName.equalsIgnoreCase ("Volume") && sLine.startsWith (" "))
+				ParseSinkOrSourceBlock (sBlock, sFirstLineOfBlock, arrayBlockLines, mapResult);
+
+				if (StringUtils.startsWithIgnoreCase (sFirstLineOfBlock, "Sink"))
 				{
-					String sBalance = sLine.trim ().substring ("balance ".length ());
-					mapResult.put (sLine1 + ".Volume.balance", sBalance);
-				}
-				else if (sAttributeName.equalsIgnoreCase ("Properties") && sLine.startsWith ("	"))
-				{
-					sLine = sLine.substring (1);	// 再去掉左边的第二个 TAB 字符
-					String[] arrayProperty = sLine.split (" = ", 2);
-					mapResult.put (sLine1 + ".Properties." + arrayProperty[0], arrayProperty[1]);
-				}
-				else if (sAttributeName.equalsIgnoreCase ("Ports") && sLine.startsWith ("	"))
-				{
-					sLine = sLine.substring (1);	// 再去掉左边的第二个 TAB 字符
-					//String[] arrayProperty = sLine.split (": *", 2);
-					//mapResult.put (sLine1 + ".Ports." + arrayProperty[0], arrayProperty[1]);
-				}
-				else if (sAttributeName.equalsIgnoreCase ("Formats") && sLine.startsWith ("	"))
-				{
-					sLine = sLine.substring (1);	// 再去掉左边的第二个 TAB 字符
-					//String[] arrayFormat = sLine.split (" = ", 2);
-					//mapResult.put (sLine1 + ".Formats." + arrayFormat[0], arrayFormat[1]);
-				}
-				else
-				{
-					if (sLine.isEmpty ())	// 本块的最后一行
-						continue;
-					String[] arrayLine = sLine.split (": *", 2);
-					sAttributeName = arrayLine[0];
-					String sAttributeValue = arrayLine[1];
-					if (sAttributeName.equalsIgnoreCase ("Volume"))
+					mapResult.put ("LastSinkBlockName", sFirstLineOfBlock);
+
+					String sDriver = (String)mapResult.get (sFirstLineOfBlock + ".Driver");
+					if (StringUtils.startsWithIgnoreCase (sDriver, "module-bluez"))
 					{
-						String[] arrayChannels = sAttributeValue.split (", *");
-						for (String sChannel : arrayChannels)
+						mapResult.put ("LastSinkBlockName_Bluetooth", sFirstLineOfBlock);
+						String sBluetoothProtocol = (String)mapResult.get (sFirstLineOfBlock + ".Properties.bluetooth.protocol");
+						if (StringUtils.equalsIgnoreCase (sBluetoothProtocol, "a2dp_sink"))	// 这里会出现 a2dp_source ? 貌似不会
 						{
-							String[] arrayChannel = sChannel.split (": *", 2);
-							String sChannelName = arrayChannel[0];
-							String sChannelVolumeExpression = arrayChannel[1];
-							String[] arrayChannelVolumeExpressions = sChannelVolumeExpression.split (" +/ +");
-							if (arrayChannelVolumeExpressions != null)
-							{
-								if (arrayChannelVolumeExpressions.length >= 1)
-									mapResult.put (sLine1 + ".Volume." + sChannelName + ".integer", arrayChannelVolumeExpressions[0]);
-								if (arrayChannelVolumeExpressions.length >= 2)
-									mapResult.put (sLine1 + ".Volume." + sChannelName + ".percentage", arrayChannelVolumeExpressions[1]);
-								if (arrayChannelVolumeExpressions.length >= 3)
-									mapResult.put (sLine1 + ".Volume." + sChannelName + ".dB", arrayChannelVolumeExpressions[2]);
-							}
+							mapResult.put ("LastSinkBlockName_Bluetooth_a2dp_sink", sFirstLineOfBlock);
 						}
 					}
-					else if (sAttributeName.equalsIgnoreCase ("Properties"))
+				}
+				else if (StringUtils.startsWithIgnoreCase (sFirstLineOfBlock, "Source"))
+				{
+					mapResult.put ("LastSourceBlockName", sFirstLineOfBlock);
+
+					String sDriver = (String)mapResult.get (sFirstLineOfBlock + ".Driver");
+					if (StringUtils.startsWithIgnoreCase (sDriver, "module-bluez"))
 					{
-					}
-					else if (sAttributeName.equalsIgnoreCase ("Ports"))
-					{
-					}
-					else if (sAttributeName.equalsIgnoreCase ("Formats"))
-					{
-					}
-					else if (sAttributeName.charAt (0) != '\t' && sAttributeName.charAt (0) != ' ')
-					{
-						mapResult.put (sLine1 + "." + sAttributeName, sAttributeValue);
+						mapResult.put ("LastSourceBlockName_Bluetooth", sFirstLineOfBlock);
+						String sBluetoothProtocol = (String)mapResult.get (sFirstLineOfBlock + ".Properties.bluetooth.protocol");
+						if (StringUtils.equalsIgnoreCase (sBluetoothProtocol, "a2dp_source"))	// 这里会出现 a2dp_sink ? 貌似不会
+						{
+							mapResult.put ("LastSourceBlockName_Bluetooth_a2dp_source", sFirstLineOfBlock);
+						}
 					}
 				}
 			}
+			mapResult.put (sFirstLineOfBlock, sBlock);
+
+			List<String> listBlockNames = (List<String>) mapResult.get ("BlockNamesList");
+			if (listBlockNames == null)
+			{
+				listBlockNames = new ArrayList<String> ();
+				mapResult.put ("BlockNamesList", listBlockNames);
 			}
-			//mapResult.put (sLine1, sBlock);
+			listBlockNames.add (sFirstLineOfBlock);
 		}
 		return mapResult;
+	}
+
+	public static void ParseSinkOrSourceBlock (String sBlock, String sFirstLineOfBlock, String[] arrayBlockLines, Map<String, Object> mapResult)
+	{
+		String sAttributeName = "";
+		for (int i=1; i<arrayBlockLines.length; i++)
+		{
+			String sLine = arrayBlockLines[i];
+			sLine = sLine.substring (1);	// 去掉左边的 TAB 字符
+			if (StringUtils.equalsIgnoreCase (sAttributeName, "Volume") && sLine.startsWith (" "))
+			{
+				String sBalance = sLine.trim ().substring ("balance ".length ());
+				mapResult.put (sFirstLineOfBlock + ".Volume.balance", sBalance);
+			}
+			else if (StringUtils.equalsIgnoreCase (sAttributeName, "Properties") && sLine.startsWith ("	"))
+			{
+				sLine = sLine.substring (1);	// 再去掉左边的第二个 TAB 字符
+				String[] arrayProperty = sLine.split (" = ", 2);
+				//mapResult.put (sFirstLineOfBlock + ".Properties." + arrayProperty[0], arrayProperty[1]) - 1);
+				mapResult.put (sFirstLineOfBlock + ".Properties." + arrayProperty[0], StringUtils.substring (arrayProperty[1], 1, StringUtils.length (arrayProperty[1]) - 1));	// 去掉前后的引号
+			}
+			else if (StringUtils.equalsIgnoreCase (sAttributeName, "Ports") && sLine.startsWith ("	"))
+			{
+				sLine = sLine.substring (1);	// 再去掉左边的第二个 TAB 字符
+				String[] arrayPort = sLine.split (": *", 2);
+				mapResult.put (sFirstLineOfBlock + ".Ports." + arrayPort[0], arrayPort[1]);
+
+				// 从 arrayPort[1] 中取出 port 的名称、优先级、是否可用（是否当前的端口？）
+				String sPortName = "";
+				String sPortPriority = "";
+				String sPortAvailability = "";
+				sPortName = arrayPort[1].substring (0, arrayPort[1].indexOf ('(') - 1);
+				mapResult.put (sFirstLineOfBlock + ".Ports." + arrayPort[0] + ".name", sPortName);
+
+				String sPortProperties = arrayPort[1].substring (arrayPort[1].indexOf ('(') + 1, arrayPort[1].indexOf (')') - 1);
+				String[] arrayPortProperties = arrayPort[1].split (", *");
+				for (String sPortProperty : arrayPortProperties)
+				{
+					if (StringUtils.containsIgnoreCase (sPortProperty, "available"))
+					{
+						sPortAvailability = sPortProperty;
+						mapResult.put (sFirstLineOfBlock + ".Ports." + arrayPort[0] + ".availability", sPortAvailability);
+					}
+					else if (sPortProperty.contains (": "))
+					{
+						String[] arrayPortProperty = sPortProperty.split (": ");
+						if (StringUtils.equalsIgnoreCase (arrayPortProperty[0], "priority"))
+						{
+							sPortPriority = arrayPortProperty[1];
+							mapResult.put (sFirstLineOfBlock + ".Ports." + arrayPort[0] + ".priority", sPortPriority);
+						}
+					}
+				}
+			}
+			else if (StringUtils.equalsIgnoreCase (sAttributeName, "Formats") && StringUtils.startsWithIgnoreCase (sLine, "	"))
+			{
+				sLine = sLine.substring (1);	// 再去掉左边的第二个 TAB 字符
+			}
+			else
+			{
+				if (StringUtils.isEmpty (sLine))	// 本块的最后一行
+					continue;
+				String[] arrayLine = sLine.split (": *", 2);
+				sAttributeName = arrayLine[0];
+				String sAttributeValue = arrayLine[1];
+				if (StringUtils.equalsIgnoreCase (sAttributeName, "Volume"))
+				{
+					String[] arrayChannels = sAttributeValue.split (", *");
+					for (String sChannel : arrayChannels)
+					{
+						String[] arrayChannel = sChannel.split (": *", 2);
+						String sChannelName = arrayChannel[0];
+						String sChannelVolumeExpression = arrayChannel[1];
+						String[] arrayChannelVolumeExpressions = sChannelVolumeExpression.split (" +/ +");
+						if (arrayChannelVolumeExpressions != null)
+						{
+							if (arrayChannelVolumeExpressions.length >= 1)
+								mapResult.put (sFirstLineOfBlock + ".Volume." + sChannelName + ".integer", arrayChannelVolumeExpressions[0]);
+							if (arrayChannelVolumeExpressions.length >= 2)
+								mapResult.put (sFirstLineOfBlock + ".Volume." + sChannelName + ".percentage", arrayChannelVolumeExpressions[1]);
+							if (arrayChannelVolumeExpressions.length >= 3)
+								mapResult.put (sFirstLineOfBlock + ".Volume." + sChannelName + ".dB", arrayChannelVolumeExpressions[2]);
+						}
+					}
+				}
+				else if (StringUtils.equalsIgnoreCase (sAttributeName, "Properties"))
+				{
+				}
+				else if (StringUtils.equalsIgnoreCase (sAttributeName, "Ports"))
+				{
+				}
+				else if (StringUtils.equalsIgnoreCase (sAttributeName, "Formats"))
+				{
+				}
+				else if (sAttributeName.charAt (0) != '\t' && sAttributeName.charAt (0) != ' ')
+				{
+					mapResult.put (sFirstLineOfBlock + "." + sAttributeName, sAttributeValue);
+				}
+			}
+		}
 	}
 
 	public static String pactl_exit (String... arrayOtherParams)
@@ -448,9 +521,14 @@ System.out.println ("pactl 执行 " + (rc == 0 ? "成功" : "失败：" + rc));
 	}
 
 
+	public static String GetVolumeInPercentage (Map<String, Object> mapResult, String sBlockName, String sChannelName)
+	{
+		return (String)mapResult.get (sBlockName + ".Volume." + sChannelName + ".percentage");
+	}
+
 	public static String GetSinkVolumeInPercentage (Map<String, Object> mapResult, String sSinkIndex, String sChannelName)
 	{
-		return (String)mapResult.get ("Sink #" + sSinkIndex + ".Volume." + sChannelName + ".percentage");
+		return GetVolumeInPercentage (mapResult, "Sink #" + sSinkIndex, sChannelName);
 	}
 	public static String GetSinkVolumeInPercentage (String sSinkIndex, String sChannelName)
 	{
@@ -468,20 +546,26 @@ System.out.println ("pactl 执行 " + (rc == 0 ? "成功" : "失败：" + rc));
 
 	public static String GetSourceVolumeInPercentage (Map<String, Object> mapResult, String sSourceIndex, String sChannelName)
 	{
-		return (String)mapResult.get ("Source #" + sSourceIndex + ".Volume." + sChannelName + ".percentage");
+		return GetVolumeInPercentage (mapResult, "Source #" + sSourceIndex, sChannelName);
 	}
 	public static String GetSourceVolumeInPercentage (String sSourceIndex, String sChannelName)
 	{
 		Map<String, Object> mapResult = pactl_list ("sources");
+//System.out.println (mapResult);
 		return GetSourceVolumeInPercentage (mapResult, sSourceIndex, sChannelName);
 	}
 	public static String GetSourceVolumeInPercentage (String sSourceIndex)
 	{
 		return GetSourceVolumeInPercentage (sSourceIndex, "front-left");
 	}
+	public static String GetLastSourceBlockName_Bluetooth (Map<String, Object> mapResult)
+	{
+		return (String)mapResult.get ("LastSourceBlockName_Bluetooth");
+	}
 
 	public static void main (String[] args)
 	{
 		GetSinkVolumeInPercentage ("0");
+		GetSourceVolumeInPercentage ("1");
 	}
 }
