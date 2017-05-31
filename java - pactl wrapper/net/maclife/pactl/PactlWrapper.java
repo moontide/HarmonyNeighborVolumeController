@@ -131,6 +131,12 @@ System.out.println ("pactl 执行 " + (rc == 0 ? "成功" : "失败：" + rc));
 		return pactl (args);
 	}
 
+	// -------------------------------------------------------------------------
+	//
+	// 一级封装
+	//
+	// -------------------------------------------------------------------------
+
 	public static String pactl_help ()
 	{
 		return pactlWith1MandatoryArguments ("--help");
@@ -521,6 +527,43 @@ System.out.println ("pactl 执行 " + (rc == 0 ? "成功" : "失败：" + rc));
 	}
 
 
+	// -------------------------------------------------------------------------
+	//
+	// 二级封装：一些便利函数。
+	// 使用该类的应用程序可以结合一类封装里的返回结果（主要是 pactl_list），然后利用二级封装的这些便利函数来进行处理。
+	//
+	// -------------------------------------------------------------------------
+
+	/**
+	 * 从 BlockName 中取出索引号，比如：从 "Sink #1" 取出 "1"
+	 * @param sBlockName
+	 * @return
+	 */
+	public static String GetIndexFromBlockName (String sBlockName)
+	{
+		return sBlockName.substring (sBlockName.indexOf("#") + 1);
+	}
+
+	/**
+	 * 根据 Block 和索引号生成 BlockName
+	 * @param sBlock 必须是按 pactl 的 BlockName 习惯命名的字符串。pactl 当前命名习惯：首字母大写的一个单词，如 "Sink"、"Source"。
+	 * @param sIndex
+	 * @return
+	 */
+	public static String GenerateBlockNameFromIndex (String sBlock, String sIndex)
+	{
+		return sBlock + " #" + sIndex;
+	}
+	public static String GenerateSinkBlockNameFromIndex (String sIndex)
+	{
+		return GenerateBlockNameFromIndex ("Sink", sIndex);
+	}
+	public static String GenerateSourceBlockNameFromIndex (String sIndex)
+	{
+		return GenerateBlockNameFromIndex ("Source", sIndex);
+	}
+
+
 	public static String GetVolumeInPercentage (Map<String, Object> mapResult, String sBlockName, String sChannelName)
 	{
 		return (String)mapResult.get (sBlockName + ".Volume." + sChannelName + ".percentage");
@@ -528,15 +571,15 @@ System.out.println ("pactl 执行 " + (rc == 0 ? "成功" : "失败：" + rc));
 
 	public static String GetSinkVolumeInPercentage (Map<String, Object> mapResult, String sSinkIndex, String sChannelName)
 	{
-		return GetVolumeInPercentage (mapResult, "Sink #" + sSinkIndex, sChannelName);
+		return GetVolumeInPercentage (mapResult, GenerateSinkBlockNameFromIndex(sSinkIndex), sChannelName);
 	}
 	public static String GetSinkVolumeInPercentage (String sSinkIndex, String sChannelName)
 	{
 		Map<String, Object> mapResult = pactl_list ("sinks");
 //System.out.println (mapResult);
-//System.out.println (mapResult.get ("Sink #" + sSinkIndex + ".Volume." + sChannelName + ".integer"));
-//System.out.println (mapResult.get ("Sink #" + sSinkIndex + ".Volume." + sChannelName + ".percentage"));
-//System.out.println (mapResult.get ("Sink #" + sSinkIndex + ".Volume." + sChannelName + ".dB"));
+//System.out.println (mapResult.get (GenerateSinkBlockNameFromIndex (sSinkIndex) + ".Volume." + sChannelName + ".integer"));
+//System.out.println (mapResult.get (GenerateSinkBlockNameFromIndex (sSinkIndex) + ".Volume." + sChannelName + ".percentage"));
+//System.out.println (mapResult.get (GenerateSinkBlockNameFromIndex (sSinkIndex) + ".Volume." + sChannelName + ".dB"));
 		return GetSinkVolumeInPercentage (mapResult, sSinkIndex, sChannelName);
 	}
 	public static String GetSinkVolumeInPercentage (String sSinkIndex)
@@ -546,7 +589,7 @@ System.out.println ("pactl 执行 " + (rc == 0 ? "成功" : "失败：" + rc));
 
 	public static String GetSourceVolumeInPercentage (Map<String, Object> mapResult, String sSourceIndex, String sChannelName)
 	{
-		return GetVolumeInPercentage (mapResult, "Source #" + sSourceIndex, sChannelName);
+		return GetVolumeInPercentage (mapResult, GenerateSourceBlockNameFromIndex (sSourceIndex), sChannelName);
 	}
 	public static String GetSourceVolumeInPercentage (String sSourceIndex, String sChannelName)
 	{
@@ -561,6 +604,34 @@ System.out.println ("pactl 执行 " + (rc == 0 ? "成功" : "失败：" + rc));
 	public static String GetLastSourceBlockName_Bluetooth (Map<String, Object> mapResult)
 	{
 		return (String)mapResult.get ("LastSourceBlockName_Bluetooth");
+	}
+
+
+	public static String GetSinkName (Map<String, Object> mapResult, String sSinkIndex)
+	{
+		String sKeyName_SinkDescription = GenerateSinkBlockNameFromIndex (sSinkIndex) + ".Description";
+		return (String)mapResult.get(sKeyName_SinkDescription);
+	}
+	public static String GetSinkActivePort (Map<String, Object> mapResult, String sSinkIndex)
+	{
+		String sKeyName_ActivePort = GenerateSinkBlockNameFromIndex (sSinkIndex) + ".Active Port";
+		String sActivePort = (String)mapResult.get(sKeyName_ActivePort);
+		return sActivePort;
+	}
+	public static String GetSinkPortName (Map<String, Object> mapResult, String sSinkIndex, String sPort)
+	{
+		String sKeyName_PortName = GenerateSinkBlockNameFromIndex (sSinkIndex) + ".Ports." + sPort + ".name";
+		String sPortName = (String)mapResult.get(sKeyName_PortName);
+		return sPortName;
+	}
+	public static boolean IsEarphonePluggedIn (String sActivePort)
+	{
+		boolean bEarphonePlugged = false;
+		if (StringUtils.isNotEmpty (sActivePort) && StringUtils.endsWithIgnoreCase(sActivePort, "-headphones"))
+		{
+			bEarphonePlugged = true;
+		}
+		return bEarphonePlugged;
 	}
 
 	public static void main (String[] args)
