@@ -12,31 +12,29 @@
 <%@ page import="com.chinamotion.database.*"%>
 
 <%!
-void GetSinkVolume (String sSinkIndex, String sChannel, ObjectNode jsonResult)
+void GetSinkVolume (Map<String, Object> mapResult, String sSinkIndex, String sChannel, ObjectNode jsonResult)
 {
-	Map<String, Object> mapResult = PactlWrapper.pactl_list ("sinks");
 	String sVolume = PactlWrapper.GetSinkVolumeInPercentage (mapResult, sSinkIndex, sChannel);
 	jsonResult.put ("sink_volume", sVolume);
 
-	String sKeyName_SinkDescription = "Sink #" + sSinkIndex + ".Description";
-	jsonResult.put ("sink_name", (String)mapResult.get(sKeyName_SinkDescription));
+	jsonResult.put ("sink_name", PactlWrapper.GetSinkName (mapResult, sSinkIndex));
 
-	String sKeyName_ActivePort = "Sink #" + sSinkIndex + ".Active Port";
-	String sActivePort = (String)mapResult.get(sKeyName_ActivePort);
-	String sKeyName_ActivePortName = "Sink #" + sSinkIndex + ".Ports." + sActivePort + ".name";
-	String sActivePortName = (String)mapResult.get(sKeyName_ActivePortName);
+	String sActivePort = PactlWrapper.GetSinkActivePort (mapResult, sSinkIndex);
+	String sActivePortName = PactlWrapper.GetSinkPortName (mapResult, sSinkIndex, sActivePort);
 	jsonResult.put ("sink_active_port_name", sActivePortName);
-	boolean bEarphonePlugged = false;
-	if (StringUtils.isNotEmpty (sActivePort) && StringUtils.endsWithIgnoreCase(sActivePort, "-headphones"))
-	{
-		bEarphonePlugged = true;
-	}
+
+	boolean bEarphonePlugged = PactlWrapper.IsEarphonePluggedIn (sActivePort);
 	jsonResult.put ("earphone_plugged_in", bEarphonePlugged);
 }
-
-void GetSourceVolume (String sSourceIndex, String sChannel, ObjectNode jsonResult)
+void GetSinkVolume (String sSinkIndex, String sChannel, ObjectNode jsonResult)
 {
-	Map<String, Object> mapResult = PactlWrapper.pactl_list ("sources");
+	Map<String, Object> mapResult = PactlWrapper.pactl_list ("sinks");
+	GetSinkVolume (mapResult, sSinkIndex, sChannel, jsonResult);
+}
+
+
+void GetSourceVolume (Map<String, Object> mapResult, String sSourceIndex, String sChannel, ObjectNode jsonResult)
+{
 	String sVolume = PactlWrapper.GetSourceVolumeInPercentage (mapResult, sSourceIndex, sChannel);
 	jsonResult.put ("source_volume", sVolume);
 
@@ -49,10 +47,15 @@ void GetSourceVolume (String sSourceIndex, String sChannel, ObjectNode jsonResul
 	String sActivePortName = (String)mapResult.get (sKeyName_ActivePortName);
 	jsonResult.put ("source_active_port_name", sActivePortName);
 }
-
-void GetLastBluetoothSourceVolume (String sChannel, ObjectNode jsonResult)
+void GetSourceVolume (String sSourceIndex, String sChannel, ObjectNode jsonResult)
 {
 	Map<String, Object> mapResult = PactlWrapper.pactl_list ("sources");
+	GetSourceVolume (mapResult, sSourceIndex, sChannel, jsonResult);
+}
+
+
+void GetLastBluetoothSourceVolume (Map<String, Object> mapResult, String sChannel, ObjectNode jsonResult)
+{
 	String sLastSourceBlockName_Bluetooth = PactlWrapper.GetLastSourceBlockName_Bluetooth (mapResult);
 	String sVolume = null;
 	//sVolume = PactlWrapper.GetSourceVolumeInPercentage (mapResult, sSourceIndex, sChannel);
@@ -74,6 +77,11 @@ void GetLastBluetoothSourceVolume (String sChannel, ObjectNode jsonResult)
 		jsonResult.put ("source_active_port_name", sActivePortName);
 	}
 }
+void GetLastBluetoothSourceVolume (String sChannel, ObjectNode jsonResult)
+{
+	Map<String, Object> mapResult = PactlWrapper.pactl_list ("sources");
+	GetLastBluetoothSourceVolume (mapResult, sChannel, jsonResult);
+}
 %>
 
 <%@ include file='config.jsp'%>
@@ -94,6 +102,7 @@ try
 }
 catch (Exception e)
 {
+	e.printStackTrace ();
 }
 
 ObjectMapper jacksonObjectMapper_Loose = new ObjectMapper ();	// 不那么严格的选项，但解析时也支持严格选项
@@ -104,85 +113,185 @@ ObjectMapper jacksonObjectMapper_Loose = new ObjectMapper ();	// 不那么严格
 	jacksonObjectMapper_Loose.configure (JsonParser.Feature.ALLOW_NUMERIC_LEADING_ZEROS, true);	// 允许数值前面带 0
 
 jsonResult = jacksonObjectMapper_Loose.createObjectNode ();
-jsonResult.put ("rc", 0);
+jsonResult.put ("rc", HttpServletResponse.SC_OK);
 try
 {
 
-PactlWrapper.sServer = "localhost";	// 防止【运行 tomcat 的用户是 tomcat 时 执行 pactl 会失败】的问题
+	PactlWrapper.sServer = "localhost";	// 防止【运行 tomcat 的用户是 tomcat 时 执行 pactl 会失败】的问题
 
-if (StringUtils.isEmpty (sAction) || StringUtils.equalsIgnoreCase (sAction, "get-volume"))
-{
-	if (! isSource)
-		GetSinkVolume (sPACTL_SINK_DEVICE, sPACTL_SINK_DEVICE_CHANNEL_TO_GET_VOLUME, jsonResult);
-	else
+	if (StringUtils.isEmpty (sAction) || StringUtils.equalsIgnoreCase (sAction, "get-volume"))
 	{
-		GetLastBluetoothSourceVolume (sPACTL_SOURCE_DEVICE_CHANNEL_TO_GET_VOLUME, jsonResult);
-		if (jsonResult.get ("source_volume") == null)	// 没有蓝牙音源接入进来
+		if (! isSource)
+			GetSinkVolume (sPACTL_SINK_DEVICE, sPACTL_SINK_DEVICE_CHANNEL_TO_GET_VOLUME, jsonResult);
+		else
 		{
-			jsonResult.put ("rc", 404);
+			GetLastBluetoothSourceVolume (sPACTL_SOURCE_DEVICE_CHANNEL_TO_GET_VOLUME, jsonResult);
+			if (jsonResult.get ("source_volume") == null)	// 没有蓝牙音源接入进来
+			{
+				jsonResult.put ("rc", HttpServletResponse.SC_NOT_FOUND);
+				jsonResult.put ("msg", "当前没有蓝牙音源接入进来");
+			}
 		}
 	}
-}
-else if (StringUtils.equalsIgnoreCase (sAction, "adjust-volume"))
-{
-	String sDirection = StringUtils.trimToEmpty (request.getParameter ("direction"));
-
-	Map<String, Object> mapResult = PactlWrapper.pactl_list ("sinks");
-	String sVolume = PactlWrapper.GetSinkVolumeInPercentage (mapResult, sPACTL_SINK_DEVICE, sPACTL_SINK_DEVICE_CHANNEL_TO_GET_VOLUME);
-	sVolume = sVolume.substring (0, sVolume.length() - 1);	// 去掉百分号
-	int nCurrentVolume = Integer.parseInt (sVolume);
-	int nDestinationVolume = nCurrentVolume;
-	boolean bAdjusted = false;
-	if (StringUtils.equalsIgnoreCase (sDirection, "+"))
+	else if (StringUtils.equalsIgnoreCase (sAction, "adjust-volume"))
 	{
-		nDestinationVolume += nVOLUME_ADJUST_STEP;
-		if (nCurrentVolume >= nMAX_ALLOWED_VOLUME_TO_ADJUST)	// 当前音量已经超过能调节到的最大音量
+		String sDirection = StringUtils.trimToEmpty (request.getParameter ("direction"));
+
+		Map<String, Object> mapResult = PactlWrapper.pactl_list ();	//PactlWrapper.pactl_list ("sinks");
+		String sActivePort = PactlWrapper.GetSinkActivePort (mapResult, sPACTL_SINK_DEVICE);
+		//String sActivePortName = PactlWrapper.GetSinkPortName (mapResult, sPACTL_SINK_DEVICE, sActivePort);
+		//jsonResult.put ("sink_active_port_name", sActivePortName);
+		boolean bEarphonePlugged = PactlWrapper.IsEarphonePluggedIn (sActivePort);
+
+		if (bEarphonePlugged && ! bALLOW_ADJUST_VOLUME_WHEN_WEARING_EARPHONE)
 		{
-			jsonResult.put ("rc", 403);
-			jsonResult.put ("msg", "当前音量 " + sVolume + "% 已经超过(或者等于)你能调节到的最大音量 " + nMAX_ALLOWED_VOLUME_TO_ADJUST + "%，所以禁止再调大音量。");
+			jsonResult.put ("rc", HttpServletResponse.SC_FORBIDDEN);
+			jsonResult.put ("msg", "已经插上了耳机，禁止再调节音量。");
+out.println (jsonResult);
+			return;
+		}
+
+		if (! isSource)
+		{
+			String sVolume = PactlWrapper.GetSinkVolumeInPercentage (mapResult, sPACTL_SINK_DEVICE, sPACTL_SINK_DEVICE_CHANNEL_TO_GET_VOLUME);
+			sVolume = sVolume.substring (0, sVolume.length() - 1);	// 去掉百分号
+			int nCurrentVolume = Integer.parseInt (sVolume);
+			int nDestinationVolume = nCurrentVolume;
+			boolean bAdjusted = false;
+			if (StringUtils.equalsIgnoreCase (sDirection, "+"))
+			{
+				nDestinationVolume += nVOLUME_ADJUST_STEP;
+				if (nCurrentVolume >= nMAX_ALLOWED_VOLUME_TO_ADJUST)	// 当前音量已经超过能调节到的最大音量
+				{
+					jsonResult.put ("rc", HttpServletResponse.SC_FORBIDDEN);
+					jsonResult.put ("msg", "当前音量 " + sVolume + "% 已经超过(或者等于)你能调节到的最大音量 " + nMAX_ALLOWED_VOLUME_TO_ADJUST + "%，所以禁止再调大音量。");
+				}
+				else
+				{
+					if (nDestinationVolume > nMAX_ALLOWED_VOLUME_TO_ADJUST)
+					{
+						nDestinationVolume = nMAX_ALLOWED_VOLUME_TO_ADJUST;
+						//jsonResult.put ("rc", HttpServletResponse.SC_FORBIDDEN);
+						//jsonResult.put ("msg", "您能调节到的最大音量是 " + nMAX_ALLOWED_VOLUME_TO_ADJUST + "%");
+					}
+					PactlWrapper.pactl_set_sink_volume (sPACTL_SINK_DEVICE, nDestinationVolume + "%");
+					bAdjusted = true;
+				}
+			}
+			else if (StringUtils.equalsIgnoreCase (sDirection, "-"))
+			{
+				nDestinationVolume -= nVOLUME_ADJUST_STEP;
+				if (nCurrentVolume <= nMIN_ALLOWED_VOLUME_TO_ADJUST)	// 当前音量已经低于能调节到的最小音量
+				{
+					jsonResult.put ("rc", HttpServletResponse.SC_FORBIDDEN);
+					jsonResult.put ("msg", "当前音量 " + sVolume + "% 已经低于(或者等于)你能调节到的最小音量 " + nMIN_ALLOWED_VOLUME_TO_ADJUST + "%，所以禁止再调小音量。");
+				}
+				else
+				{
+					if (nDestinationVolume < nMIN_ALLOWED_VOLUME_TO_ADJUST)
+					{
+						nDestinationVolume = nMIN_ALLOWED_VOLUME_TO_ADJUST;
+					}
+					PactlWrapper.pactl_set_sink_volume (sPACTL_SINK_DEVICE, nDestinationVolume + "%");
+					bAdjusted = true;
+				}
+			}
+			else
+			{
+				jsonResult.put ("rc", HttpServletResponse.SC_BAD_REQUEST);
+				jsonResult.put ("msg", "缺少参数！");
+			}
+
+			if (bAdjusted)
+			{
+				/*
+				if (true && bPLAY_BAIDU_TTS_WHEN_ADJUSTING_VOLUME)
+				{
+					// 调用百度 TTS 合成文字
+					// "设备 *** 调节音量到 50%"
+				}
+				jsonResult.put ("volume", "当前音量");
+				jsonResult.put ("volume.lfe", "当前低音声道音量");
+				jsonResult.put ("volume.bluetooth", "当前蓝牙输入音量");
+				*/
+			}
 		}
 		else
 		{
-			if (nDestinationVolume > nMAX_ALLOWED_VOLUME_TO_ADJUST)
+			//mapResult = PactlWrapper.pactl_list ("sources");
+			String sLastSourceBlockName_Bluetooth = PactlWrapper.GetLastSourceBlockName_Bluetooth (mapResult);
+			if (StringUtils.isNotEmpty (sLastSourceBlockName_Bluetooth))
 			{
-				nDestinationVolume = nMAX_ALLOWED_VOLUME_TO_ADJUST;
-				//jsonResult.put ("rc", 403);
-				//jsonResult.put ("msg", "您能调节到的最大音量是 " + nMAX_ALLOWED_VOLUME_TO_ADJUST + "%");
+				String sSourceIndex = PactlWrapper.GetIndexFromBlockName (sLastSourceBlockName_Bluetooth);
+				String sVolume = PactlWrapper.GetVolumeInPercentage (mapResult, sLastSourceBlockName_Bluetooth, sPACTL_SOURCE_DEVICE_CHANNEL_TO_GET_VOLUME);
+				sVolume = sVolume.substring (0, sVolume.length() - 1);	// 去掉百分号
+				int nCurrentVolume = Integer.parseInt (sVolume);
+				int nDestinationVolume = nCurrentVolume;
+				boolean bAdjusted = false;
+				if (StringUtils.equalsIgnoreCase (sDirection, "+"))
+				{
+					nDestinationVolume += nVOLUME_ADJUST_STEP;
+					if (nCurrentVolume >= nMAX_ALLOWED_VOLUME_TO_ADJUST)	// 当前音量已经超过能调节到的最大音量
+					{
+						jsonResult.put ("rc", HttpServletResponse.SC_FORBIDDEN);
+						jsonResult.put ("msg", "当前音量 " + sVolume + "% 已经超过(或者等于)你能调节到的最大音量 " + nMAX_ALLOWED_VOLUME_TO_ADJUST + "%，所以禁止再调大音量。");
+					}
+					else
+					{
+						if (nDestinationVolume > nMAX_ALLOWED_VOLUME_TO_ADJUST)
+						{
+							nDestinationVolume = nMAX_ALLOWED_VOLUME_TO_ADJUST;
+							//jsonResult.put ("rc", HttpServletResponse.SC_FORBIDDEN);
+							//jsonResult.put ("msg", "您能调节到的最大音量是 " + nMAX_ALLOWED_VOLUME_TO_ADJUST + "%");
+						}
+						PactlWrapper.pactl_set_source_volume (sSourceIndex, nDestinationVolume + "%");
+					}
+				}
+				else if (StringUtils.equalsIgnoreCase (sDirection, "-"))
+				{
+					nDestinationVolume -= nVOLUME_ADJUST_STEP;
+					if (nCurrentVolume <= nMIN_ALLOWED_VOLUME_TO_ADJUST)	// 当前音量已经低于能调节到的最小音量
+					{
+						jsonResult.put ("rc", HttpServletResponse.SC_FORBIDDEN);
+						jsonResult.put ("msg", "当前音量 " + sVolume + "% 已经低于(或者等于)你能调节到的最小音量 " + nMIN_ALLOWED_VOLUME_TO_ADJUST + "%，所以禁止再调小音量。");
+					}
+					else
+					{
+						if (nDestinationVolume < nMIN_ALLOWED_VOLUME_TO_ADJUST)
+						{
+							nDestinationVolume = nMIN_ALLOWED_VOLUME_TO_ADJUST;
+						}
+						PactlWrapper.pactl_set_source_volume (sSourceIndex, nDestinationVolume + "%");
+					}
+				}
+				else
+				{
+					jsonResult.put ("rc", HttpServletResponse.SC_BAD_REQUEST);
+					jsonResult.put ("msg", "缺少参数！");
+				}
+
+				if (bAdjusted)
+				{
+					/*
+					if (true && bPLAY_BAIDU_TTS_WHEN_ADJUSTING_VOLUME)
+					{
+						// 调用百度 TTS 合成文字
+						// "设备 *** 调节音量到 50%"
+					}
+					jsonResult.put ("volume", "当前音量");
+					jsonResult.put ("volume.lfe", "当前低音声道音量");
+					jsonResult.put ("volume.bluetooth", "当前蓝牙输入音量");
+					*/
+				}
 			}
-			PactlWrapper.pactl_set_sink_volume (sPACTL_SINK_DEVICE, nDestinationVolume + "%");
-		}
-	}
-	else if (StringUtils.equalsIgnoreCase (sDirection, "-"))
-	{
-		nDestinationVolume -= nVOLUME_ADJUST_STEP;
-		if (nCurrentVolume <= nMIN_ALLOWED_VOLUME_TO_ADJUST)	// 当前音量已经低于能调节到的最小音量
-		{
-			jsonResult.put ("rc", 403);
-			jsonResult.put ("msg", "当前音量 " + sVolume + "% 已经低于(或者等于)你能调节到的最小音量 " + nMIN_ALLOWED_VOLUME_TO_ADJUST + "%，所以禁止再调小音量。");
-		}
-		else
-		{
-			if (nDestinationVolume < nMIN_ALLOWED_VOLUME_TO_ADJUST)
+			else
 			{
-				nDestinationVolume = nMIN_ALLOWED_VOLUME_TO_ADJUST;
+				// 蓝牙音源不存在时，还被人调整音量
+				jsonResult.put ("rc", HttpServletResponse.SC_NOT_FOUND);
+				jsonResult.put ("msg", "当前没有蓝牙音源接入进来");
 			}
-			PactlWrapper.pactl_set_sink_volume (sPACTL_SINK_DEVICE, nDestinationVolume + "%");
 		}
 	}
-	else
-	{
-		/*
-		if (true && bPLAY_BAIDU_TTS_WHEN_ADJUSTING_VOLUME)
-		{
-			// 调用百度 TTS 合成文字
-			// "设备 *** 调节音量到 50%"
-		}
-		jsonResult.put ("volume", "当前音量");
-		jsonResult.put ("volume.lfe", "当前低音声道音量");
-		jsonResult.put ("volume.bluetooth", "当前蓝牙输入音量");
-		*/
-	}
-}
 }
 catch (Exception e)
 {

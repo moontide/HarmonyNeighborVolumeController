@@ -1,7 +1,7 @@
 <%@ page pageEncoding="UTF-8" contentType="text/html"%>
 
 <%@ include file='config.jsp'%>
-
+<!DOCTYPE html>
 <html>
 <head>
 	<meta http-equiv='Content-Type' content='text/html; charset=utf-8'>
@@ -16,7 +16,19 @@
 	<div id='volume_controller_container'>
 	<h1>放音音量控制</h1><%-- 输出音量调节 --%>
 	<div>
-		<div id='earphone_plugged_in_text' style='display:none'>耳机已经插上，禁止调节音量。如果你的确还听到声音，则音箱可能接的不是本电脑，或者听到的不是这个音箱发出的声音。</div><%-- 只在接音箱时才允许调节音量（但对于音箱上自带耳机接口的情况，对电脑来说区分不出来：还是属于音箱，还是允许调节音量）--%>
+		<div id='earphone_plugged_in_text' style='display:none'>耳机已经插上，禁止调节音量。<br/>
+		如果你的确还听到声音，则有可能：
+		<ul>
+			<li>
+				<ul>
+					<li>音箱可能接的不是本电脑</li>
+					<li>或者音箱接的是不同的声卡</li>
+				</ul>
+				这几种情况需要去敲门了，或者通过其他途径告知。
+			</li>
+			<li>或者听到的是其他家音箱发出的声音</li>
+		</ul>
+		</div><%-- 只在接音箱时才允许调节音量（但对于音箱上自带耳机接口的情况，对电脑来说区分不出来：还是属于音箱，还是允许调节音量）--%>
 
 		<div>所控制的放音设备: <span id='pulseaudio_sink_name' class='data'></span><br/><span id='pulseaudio_sink_port' class='data'></span></div>
 		<div>当前音量: <span id='sink_volume' class='data'></span><%-- 要不断更新，有可能从不同的源头调节音量 --%>
@@ -26,7 +38,7 @@
 				<button onClick='AdjustVolume ("+");' style='float:right;'>音量++</button>
 			</div>
 
-			<label style='margin:auto auto'><input type='checkbox' onCheck=''/>对低音声道单独调节</label>
+			<label style='margin:auto auto'><input type='checkbox' onCheck='$("#lfe_channel_volume_controller_container").css("visibility", (self.checked ? "" : "hidden"));'/>对低音声道单独调节</label>
 			<div id='lfe_channel_volume_controller_container' style='visibility:hidden'>
 				低音声道音量：<span id='current_lfe_volume'></span>
 				<div class='volume-bar-container'><div id='lfe_channel_volume_bar' class='volume-bar'></div></div>
@@ -45,17 +57,16 @@
 	<div id='bluetooth_container'>
 	<h1>蓝牙及其输入音量控制</h1>
 	<div>
-		<div>当前接入的蓝牙设备【品牌名/制造商公司名】:
-			<span id='pulseaudio_source_name' class='data'></span><br/><span id='pulseaudio_source_port' class='data'></span>
-			<br/>
+		当前接入的蓝牙设备【品牌名/制造商公司名】: <span id='pulseaudio_source_name' class='data'></span><br/><span id='pulseaudio_source_port' class='data'></span>
+		<div id='container_pulseaudio_bluetooth_connected'>
 			蓝牙 MAC 地址:<br/>
 			蓝牙 MAC 地址对应的厂商:
-		</div>
-		<div>当前音量: <span id='source_volume' class='data'></span><%-- 要不断更新，有可能从不同的源头调节音量 --%>
+			<br/>
+			当前音量: <span id='source_volume' class='data'></span><%-- 要不断更新，有可能从不同的源头调节音量 --%>
 			<div class='volume-bar-container'><div id='source_volume_bar' class='volume-bar'></div></div>
 			<div>
-				<button onClick='AdjustVolume ("-", true);'>音量--</button>
-				<button onClick='AdjustVolume ("+", true);' style='float:right;'>音量++</button>
+				<button onClick='AdjustSourceVolume ("-");'>音量--</button>
+				<button onClick='AdjustSourceVolume ("+");' style='float:right;'>音量++</button>
 			</div>
 		</div>
 	</div>
@@ -78,7 +89,7 @@
 
 <script type='text/javascript'>
 $('body').ready (Init);
-setInterval (GetAndDisplayVolume, 1000);
+setInterval (GetAndDisplayVolume, 2000);
 </script>
 
 </body>

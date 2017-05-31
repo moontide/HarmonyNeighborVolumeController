@@ -3,6 +3,11 @@ body
 	width: 80%;
 	margin: auto auto;
 }
+ul,ol,li
+{
+	margin: 0;
+}
+
 #volume_controller_container
 {
 	color: green;
@@ -10,6 +15,7 @@ body
 }
 #bluetooth_container
 {
+	margin-left: 2em;	/* 蓝牙输入的音量，在输出时还是受制于主音量的 (蓝牙输入音量百分比 * 主音量百分比)，相当于：主音量包含蓝牙音量，蓝牙音量受控于主音量，所以缩进一下表示包含关系 */
 	color: blue;
 	background-color: #ccf;
 }

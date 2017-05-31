@@ -46,17 +46,20 @@ function DisplaySourceVolume (jsonData)
 	switch (jsonData.rc)
 	{
 		case 0:
+		case 200:
 			var volume = jsonData.source_volume;
 			$('#pulseaudio_source_name').text (jsonData.source_name);
-			$('#current_source_volume').text (volume);
+			$('#source_volume').text (volume);
 			$('#source_volume_bar').text (volume);
 			$('#source_volume_bar').css ('width', volume);
 
 			$('#pulseaudio_source_port').text (jsonData.source_active_port_name);
+			$('#container_pulseaudio_bluetooth_connected').css ('display', '');
 			break;
 		case 404:
+			$('#container_pulseaudio_bluetooth_connected').css ('display', 'none');
 			$('#pulseaudio_source_name').text ('');
-			$('#current_source_volume').text ('');
+			$('#source_volume').text ('');
 			$('#source_volume_bar').text ('');
 			$('#source_volume_bar').css ('width', '0%');
 			$('#pulseaudio_source_port').text ('');
@@ -73,7 +76,7 @@ function AdjustVolume (sDirection)
 	(
 		function (data)
 		{
-			if (data.rc == 0)
+			if (data.rc == 0 || data.rc == 200)
 			{
 				//DisplayVolume (data);
 			}
@@ -85,14 +88,14 @@ function AdjustVolume (sDirection)
 	);
 }
 
-function AdjustInputVolume (sDirection)
+function AdjustSourceVolume (sDirection)
 {
 	$.get ('pactl.jsp', {mac:$('#mac_address').val(), cmd:'adjust-volume', direction:sDirection, isSource:true})
 	.done
 	(
 		function (data)
 		{
-			if (data.rc == 0)
+			if (data.rc == 0 || data.rc == 200)
 			{
 				//DisplayVolume (data);
 			}
