@@ -1,3 +1,7 @@
+import $ from 'jquery';
+
+$(document).ready(() => setInterval(GetAndDisplayVolume, 2000));
+
 function Init ()
 {
 	// 初始化页面：

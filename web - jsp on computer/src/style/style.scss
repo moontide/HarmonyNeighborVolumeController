@@ -1,0 +1,83 @@
+body {
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(to bottom right, #27a275, #659bca);
+  font: {
+    family: "Helvetica Neue", Helvetica, Arial, "Lantinghei SC", "Hiragino Sans GB", STHeiti, "Microsoft Yahei", "Microsoft Sans Serif", sans-serif;
+    size: 14px;
+  }
+}
+
+h1 {
+  font-weight: 500;
+  margin: 0 {
+    bottom: 0.67em;
+  }
+}
+
+ul, ol, li {
+  margin: 0;
+}
+
+.block-container {
+  display: block;
+  position: relative;
+  width: 960px;
+  margin: 0 auto 60px;
+  padding: 20px;
+  box-shadow: 2px 2px 2px 1px rgba(0, 0, 0, 0.2);
+}
+
+.volume-controller-container {
+  margin: {
+    top: 50px;
+    bottom: 0;
+  }
+  color: #264c29;
+  background-color: #89cca1;
+}
+
+.bluetooth-container {
+  color: #4b4475;
+  background-color: #ccf;
+}
+
+.feedback-container {
+  color: #333;
+  background-color: #ffffb2;
+
+  textarea {
+    width: 100%;
+    resize: vertical;
+  }
+}
+
+#earphone_plugged_in_text
+{
+	font-size: 200%;
+	color: red;
+	background-color: yellow;
+	font-weight: bold;
+}
+
+.volume-bar-container
+{
+	width:100%;
+	border:1px solid;
+}
+.volume-bar
+{
+	margin: 4px;
+	width: 0;
+	line-height: 200%;
+	background-color: green;
+
+	color: white;
+	text-align: right;
+	font-weight: bold;
+}
+.data
+{
+	color: red;
+	font-size: larger;
+}

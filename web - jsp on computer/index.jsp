@@ -6,14 +6,12 @@
 <head>
 	<meta http-equiv='Content-Type' content='text/html; charset=utf-8'>
 	<title>睦邻音量控制器</title>
-	<link href='style.css' type='text/css' rel='stylesheet'/>
-	<script type='text/javascript' src='jquery.min.js'></script>
-	<script type='text/javascript' src='volume-controller.js'></script>
+	<link href='dist/css/style.css' type='text/css' rel='stylesheet'/>
 </head>
 
 <body>
 	<input id='mac_address' type='hidden' value='<%=request.getParameter("mac")==null ? "" : request.getParameter("mac")%>'/>
-	<div id='volume_controller_container'>
+	<div id='volume_controller_container' class='block-container volume-controller-container'>
 	<h1>放音音量控制</h1><%-- 输出音量调节 --%>
 	<div>
 		<div id='earphone_plugged_in_text' style='display:none'>耳机已经插上，禁止调节音量。<br/>
@@ -54,7 +52,7 @@
 	</div>
 	</div>
 
-	<div id='bluetooth_container'>
+	<div id='bluetooth_container' class='block-container bluetooth-container'>
 	<h1>蓝牙及其输入音量控制</h1>
 	<div>
 		当前接入的蓝牙设备【品牌名/制造商公司名】: <span id='pulseaudio_source_name' class='data'></span><br/><span id='pulseaudio_source_port' class='data'></span>
@@ -73,7 +71,7 @@
 	</div>
 
 
-	<div id='feedback_container'>
+	<div id='feedback_container' class='block-container feedback-container'>
 	<h1>留言反馈</h1>
 	<div>
 		<label><input type='radio' name='complain_category' value='too-loud'/>声音太大</label>
@@ -87,10 +85,7 @@
 	</div>
 
 
-<script type='text/javascript'>
-$('body').ready (Init);
-setInterval (GetAndDisplayVolume, 2000);
-</script>
+<script type='text/javascript' src='dist/js/app.js'></script>
 
 </body>
 </html>
